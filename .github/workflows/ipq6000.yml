@@ -41,7 +41,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v3
 
-    - name: Initialization environment
+    - name: Initialization environment(初始化环境)
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
@@ -53,20 +53,20 @@ jobs:
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
 
-    - name: Clone source code
+    - name: Clone source code(克隆源代码)
       working-directory: /workdir
       run: |
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: Cache
+    - name: Cache(缓存)
       uses: stupidloud/cachewrtbuild@main
       with:
         ccache: 'true'
         prefix: ${{ github.workspace }}/openwrt
 
-    - name: Load custom feeds
+    - name: Load custom feeds(加载自定义扩展)
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
         chmod +x $DIY_P1_SH
@@ -74,13 +74,13 @@ jobs:
         $GITHUB_WORKSPACE/$DIY_P1_SH
         git clone https://github.com/sirpdboy/luci-app-ddns-go.git package/ddns-go
 
-    - name: Update feeds
+    - name: Update feeds(更新扩展)
       run: cd openwrt && ./scripts/feeds update -a
 
-    - name: Install feeds
+    - name: Install feeds(安装扩展)
       run: cd openwrt && ./scripts/feeds install -a
 
-    - name: Load custom configuration
+    - name: Load custom configuration(加载自定义配置)
       run: |
         [ -e files ] && mv files openwrt/files
         [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
@@ -88,14 +88,14 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: SSH connection to Actions
+    - name: SSH connection to Actions(SSH 连接到 Actions)
       uses: P3TERX/ssh2actions@v1.0.0
       if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh  != 'false') || contains(github.event.action, 'ssh')
       env:
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
 
-    - name: Download package
+    - name: Download package(下载编译工具)
       id: package
       run: |
         cd openwrt
@@ -104,7 +104,7 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-    - name: Compile the firmware
+    - name: Compile the firmware(编译固件)
       id: compile
       run: |
         cd openwrt
@@ -115,18 +115,18 @@ jobs:
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
-    - name: Check space usage
+    - name: Check space usage(检查空间使用情况)
       if: (!cancelled())
       run: df -hT
 
-    - name: Upload bin directory
+    - name: Upload bin directory(上传bin目录)
       uses: actions/upload-artifact@v3
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
       with:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: openwrt/bin
 
-    - name: Organize files
+    - name: Organize files(整理文件)
       id: organize
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
@@ -135,14 +135,14 @@ jobs:
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: Upload firmware directory
+    - name: Upload firmware directory(上传固件目录)
       uses: actions/upload-artifact@v3
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
         name: ipq6000${{ env.FILE_DATE }}
         path: ${{ env.FIRMWARE }}
 
-    - name: Upload firmware to cowtransfer
+    - name: Upload firmware to cowtransfer(上传固件到 cowtransfer)
       id: cowtransfer
       if: steps.organize.outputs.status == 'success' && env.UPLOAD_COWTRANSFER == 'true' && !cancelled()
       run: |
@@ -151,7 +151,7 @@ jobs:
         echo "::warning file=cowtransfer.com::$(cat cowtransfer.log | grep https)"
         echo "url=$(cat cowtransfer.log | grep https | cut -f3 -d" ")" >> $GITHUB_OUTPUT
 
-    - name: Upload firmware to WeTransfer
+    - name: Upload firmware to WeTransfer(上传固件到 WeTransfer)
       id: wetransfer
       if: steps.organize.outputs.status == 'success' && env.UPLOAD_WETRANSFER == 'true' && !cancelled()
       run: |
@@ -160,7 +160,7 @@ jobs:
         echo "::warning file=wetransfer.com::$(cat wetransfer.log | grep https)"
         echo "url=$(cat wetransfer.log | grep https | cut -f3 -d" ")" >> $GITHUB_OUTPUT
 
-    - name: Generate release tag
+    - name: Generate release tag(生成发布标签)
       id: tag
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
@@ -171,7 +171,7 @@ jobs:
         [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: Upload firmware to release
+    - name: Upload firmware to release(上传固件发布)
       uses: softprops/action-gh-release@v1
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
@@ -181,13 +181,13 @@ jobs:
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
 
-    - name: Delete workflow runs
+    - name: Delete workflow runs(删除工作流运行)
       uses: GitRML/delete-workflow-runs@main
       with:
         retain_days: 1
         keep_minimum_runs: 3
 
-    - name: Remove old Releases
+    - name: Remove old Releases(删除旧版本)
       uses: dev-drprasad/delete-older-releases@v0.1.0
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       with:
